@@ -1,0 +1,95 @@
+
+source of code (Registration needed in Google Earth Engine) : https://code.earthengine.google.com/4e03fe1cbaae3e91f148c664280dbf33
+
+
+
+//copenghagen
+var S2_1 = ee.ImageCollection('COPERNICUS/S2_SR')
+                  .filterBounds(geometry);
+
+var S2_1 = S2_1.filterMetadata('CLOUD_COVERAGE_ASSESSMENT', 'less_than', 5);
+
+//allazw to chroniko eyros            
+var S2_1 = S2_1.filterDate('2020-06-24','2020-12-26');
+
+print(S2_1.size());
+
+            
+var S2_image = S2_1.first();
+
+var S2_clipped_collection1 = S2_1.map(function (S2_image){
+  return S2_image.clip(geometry);
+});
+
+
+var S2_image = S2_image.select('B2');
+
+var S2_clipped_collection1 = S2_clipped_collection1
+  .reduce(ee.Reducer.mean())
+  .reproject(S2_image.projection());
+
+
+
+var S2_clipped_collection1 = S2_clipped_collection1.select( 'B2_mean', 'B3_mean', 'B4_mean', 'B5_mean', 'B6_mean', 'B7_mean', 'B8_mean', 'B11_mean','B12_mean');
+
+Map.addLayer(S2_clipped_collection1, {bands:['B4_mean', 'B3_mean', 'B2_mean'], min:100, max:1600}, "ΦΥΣΙΚΗ ΕΙΚΟΝΑ");
+
+
+
+//calculate ndvi
+
+var nir = S2_clipped_collection1.select('B8_mean');
+var red = S2_clipped_collection1.select('B4_mean');
+var ndvi = nir.subtract(red).divide(nir.add(red)).rename('NDVI');
+print(ndvi, 'NDVI Lebanon July 2020 V1');
+
+// Display the result.
+var ndviParams = {min: -1, max: 1, palette: ['blue', 'white', 'green']};
+Map.addLayer(ndvi, ndviParams, 'NDVI copenghagen V1');
+
+
+var ndviParams2 = {min: -1, max: 1, };
+Map.addLayer(ndvi, ndviParams2, 'NDVI copenghagen V12');
+
+
+//threshold
+var thres = ndvi.gte(0.6).rename('thres')
+
+var  thres1 = S2_clipped_collection1.addBands(ndvi).addBands(thres);
+thres1 = thres1.select("thres")
+print(thres1)
+
+var ndviParams3 = {min: 0.6, max: 1, };
+
+Map.addLayer(thres1, ndviParams3, 'NDVI copenghagen threshold');
+
+
+for(var a =0; a <= 1; a++){
+  var x = thres1.eq(a).multiply(ee.Image.pixelArea());
+  
+  var calculation = x.reduceRegion({
+    
+    reducer:ee.Reducer.sum(),
+    geometry: geometry,
+    crs: 'EPSG: 32634',
+    scale: 10,
+    maxPixels: 1e30,
+    
+  });
+  print(calculation);
+print ('ID' + ' ' +a+ ' ' + 'km^2', calculation, ee.Number(calculation.values().get(0)).divide(1e6));
+}
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
